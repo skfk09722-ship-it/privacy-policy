@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>코순이프로젝트 - OAuth 콜백</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0a1118; color: #e8edf2;
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
+        }
+        .container {
+            text-align: center; background: #111b24; border: 1px solid #1e2d3d;
+            border-radius: 16px; padding: 48px 40px; max-width: 480px; width: 90%;
+        }
+        .spinner { font-size: 3em; margin-bottom: 16px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        h1 { margin-bottom: 8px; }
+        .status { color: #7a8a9e; margin-bottom: 24px; }
+        .success { display: none; }
+        .success .check { font-size: 4em; margin-bottom: 16px; }
+        .success h1 { color: #14b8a6; }
+        .token-box {
+            background: #0a1118; border-radius: 10px; padding: 16px;
+            margin: 16px 0; text-align: left; word-break: break-all;
+        }
+        .token-box label { color: #7a8a9e; font-size: 0.8em; display: block; margin-bottom: 4px; }
+        .token-box .value { color: #14b8a6; font-size: 0.85em; font-family: monospace; }
+        .copy-btn {
+            background: #14b8a6; color: white; border: none; padding: 10px 24px;
+            border-radius: 8px; cursor: pointer; font-size: 0.9em; margin: 8px 4px;
+        }
+        .copy-btn:hover { background: #0d9488; }
+        .error { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loading">
+            <div class="spinner">⚙️</div>
+            <h1>인증 처리 중...</h1>
+            <p class="status">Threads에서 토큰을 교환하고 있습니다.</p>
+        </div>
+        <div id="success" class="success">
+            <div class="check">✅</div>
+            <h1>인증 완료!</h1>
+            <p class="status">아래 토큰을 복사하여 사용하세요.</p>
+            <div class="token-box">
+                <label>Access Token</label>
+                <div class="value" id="token-value"></div>
+            </div>
+            <div class="token-box">
+                <label>User ID</label>
+                <div class="value" id="userid-value"></div>
+            </div>
+            <button class="copy-btn" onclick="copyToken()">📋 토큰 복사</button>
+            <button class="copy-btn" onclick="window.location.href='http://localhost:8501'">📊 대시보드 이동</button>
+        </div>
+        <div id="error" style="display:none;">
+            <div style="font-size:4em;margin-bottom:16px;">❌</div>
+            <h1 class="error">인증 실패</h1>
+            <p class="status" id="error-msg"></p>
+            <a href="/" style="color:#1da1f2;">다시 시도</a>
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+        const errorParam = params.get('error');
+
+        if (errorParam) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error-msg').textContent = errorParam;
+        } else if (code) {
+            // Exchange code for token via our local server
+            fetch('http://localhost:8502/exchange?code=' + encodeURIComponent(code))
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+                    if (data.success) {
+                        document.getElementById('success').style.display = 'block';
+                        document.getElementById('token-value').textContent = data.access_token.substring(0, 30) + '...';
+                        document.getElementById('userid-value').textContent = data.user_id;
+                        document.getElementById('token-value').dataset.full = data.access_token;
+                    } else {
+                        document.getElementById('error').style.display = 'block';
+                        document.getElementById('error-msg').textContent = data.error || 'Unknown error';
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error').style.display = 'block';
+                    document.getElementById('error-msg').textContent = '토큰 교환 서버에 연결할 수 없습니다: ' + err.message;
+                });
+        } else {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+            document.getElementById('error-msg').textContent = 'Authorization code가 없습니다.';
+        }
+
+        function copyToken() {
+            const token = document.getElementById('token-value').dataset.full;
+            navigator.clipboard.writeText(token).then(() => {
+                alert('토큰이 클립보드에 복사되었습니다!');
+            });
+        }
+    </script>
+</body>
+</html>
